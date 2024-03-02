@@ -1,43 +1,63 @@
-import React, { useState } from "react";
-import { Button ,Card} from "react-bootstrap";
+import React, { useState, useEffect, useCallback } from "react";
+import { Button, Card } from "react-bootstrap";
 
 const Movies = () => {
   const [movies, setMovies] = useState([]);
-  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null);
+  const [retry, setRetry] = useState(null);
 
-  async function fetchHandler() {
-    setIsLoading(true)
-    try {
-      const response = await fetch("https://swapi.dev/api/films");
-      if (!response.ok) {
-        throw new Error("Failed to fetch data");
+  useEffect(() => {
+    fetchHandler();
+
+    return () => {
+      if (retry) {
+        clearInterval(retry);
       }
-      const data = await response.json();
-      setMovies(data.results); // Assuming 'results' contains the movie data
-      setIsLoading(false)
+    };
+  },[]);
+
+  const fetchHandler = useCallback( async () => {
+    try {
+      fetch("https://swapi.dev/api/films")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Failed to fetch data");
+          }
+          return response.json();
+        })
+        .then((data) => {
+          setMovies(data.results);
+          setError(null); // Reset error if fetch is successful
+        })
+        .catch((error) => {
+          setError("Something went wrong... Retrying");
+          setRetry(setInterval(fetchHandler, 5000));
+        });
     } catch (error) {
-      console.error("Error:", error);
+      setError("Failed to fetch data");
     }
   }
+  ,[]);
+
+  const cancelRetry = () => {
+    setError(null);
+    clearInterval(retry);
+  };
 
   return (
     <div>
       <h1>Movies</h1>
+      {error && <p>{error}</p>}
       <ul>
-        {!isLoading  &&  movies.map((movie, index) => {
-          return <Card>
-            <li key={index}>{movie.title}</li>
-            <li key={index}>{movie.episode_id}</li>
-           <p>{movie.opening_crawl}</p>
-            </Card>
-        }
-        
-         
-         
-        )}
-        {isLoading && <p>Please Wait Loading.....</p>}
+        {movies.map((movie, index) => (
+          <Card key={index}>
+            <li>{movie.title}</li>
+            <li>{movie.episode_id}</li>
+            <p>{movie.opening_crawl}</p>
+          </Card>
+        ))}
       </ul>
-      <Button onClick={fetchHandler}>Fetch</Button>
+      <Button onClick={cancelRetry}>Cancel</Button>
     </div>
   );
 };
